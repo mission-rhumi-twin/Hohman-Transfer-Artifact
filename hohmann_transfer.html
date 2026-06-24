@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hohmann Transfer — Space Zone India</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#faf8f2;--surface:#f0ede4;--border:#ddd9cc;
+  --txt:#1a1a1a;--txt2:#5a5a5a;
+  --blue:#1a4da2;--green:#0F6E56;--coral:#D85A30;
+  --gray:#888780;--amber:#BA7517;--amber-bg:#faeeda;
+  --earth:#378ADD;--earth-glow:rgba(55,138,221,0.15);
+}
+body{font-family:Georgia,'Times New Roman',serif;background:var(--bg);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:40px 20px;color:var(--txt)}
+.header{text-align:center;margin-bottom:36px}
+.wordmark{font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--txt2);margin-bottom:12px}
+h1{font-size:28px;font-weight:700;color:#000}
+h1 span{color:var(--blue)}
+.sub{font-size:13px;color:var(--txt2);margin-top:8px;font-style:italic}
+.divider{width:48px;height:3px;background:linear-gradient(90deg,#e07a5f,var(--blue),#81b29a);margin:14px auto 0;border-radius:2px}
+.wrap{width:100%;max-width:780px}
+.sliders{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem 2.5rem;margin-bottom:1.5rem}
+.sl-group label{font-size:13px;color:var(--txt2);display:flex;justify-content:space-between;margin-bottom:8px}
+.sl-group label span{font-weight:700;font-family:Georgia,serif;color:var(--txt)}
+.sl-group input[type=range]{width:100%;accent-color:var(--blue);height:4px;cursor:pointer}
+.sl-hint{font-size:10px;color:var(--txt2);margin-top:5px;display:flex;justify-content:space-between}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.2rem}
+.metric{background:var(--surface);border:0.5px solid var(--border);border-radius:10px;padding:12px 14px}
+.metric .mval{font-size:22px;font-weight:700;color:var(--txt);font-family:Georgia,serif}
+.metric .mlbl{font-size:12px;color:var(--txt2);margin-top:3px}
+.metric .msub{font-size:10px;color:var(--txt2);margin-top:2px;opacity:.65}
+.canvas-wrap{width:100%;border-radius:12px;border:0.5px solid var(--border);overflow:hidden;background:var(--surface)}
+canvas{display:block;width:100%}
+.legend{display:flex;gap:20px;margin-top:12px;flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--txt2)}
+.dot{width:10px;height:10px;border-radius:50%}
+.flag-box{font-size:12px;color:#633806;background:var(--amber-bg);border:0.5px solid #EF9F27;border-radius:8px;padding:8px 12px;margin-bottom:12px;display:none;line-height:1.5}
+.footer{margin-top:36px;font-size:11px;color:var(--txt2);text-align:center;letter-spacing:.05em}
+@media(max-width:520px){
+  .sliders{grid-template-columns:1fr}
+  .metrics{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="wordmark">Space Zone India &nbsp;·&nbsp; Onboard Estimate Systems — Unit IV</div>
+  <h1>Hohmann <span>Transfer</span></h1>
+  <p class="sub">Drag the sliders. Watch the orbit reshape and the budget respond.</p>
+  <div class="divider"></div>
+</div>
+
+<div class="wrap">
+
+  <div class="sliders">
+    <div class="sl-group">
+      <label>Initial orbit r₁ <span id="r1val">6778 km</span></label>
+      <input type="range" id="r1" min="6578" max="20000" step="100" value="6778">
+      <div class="sl-hint"><span>LEO (6578)</span><span>MEO (20000)</span></div>
+    </div>
+    <div class="sl-group">
+      <label>Target orbit r₂ <span id="r2val">42164 km</span></label>
+      <input type="range" id="r2" min="7000" max="42164" step="100" value="42164">
+      <div class="sl-hint"><span>MEO (7000)</span><span>GEO (42164)</span></div>
+    </div>
+  </div>
+
+  <div class="flag-box" id="bielliptic-flag">
+    ⚠ r₂/r₁ &gt; 11.94 — at this ratio a bi-elliptic transfer costs less Δv than Hohmann. Flight planners switch strategies here.
+  </div>
+
+  <div class="metrics">
+    <div class="metric">
+      <div class="mval" id="dv1">—</div>
+      <div class="mlbl">Δv₁  (m/s)</div>
+      <div class="msub">burn 1 · perigee</div>
+    </div>
+    <div class="metric">
+      <div class="mval" id="dv2">—</div>
+      <div class="mlbl">Δv₂  (m/s)</div>
+      <div class="msub">burn 2 · apogee</div>
+    </div>
+    <div class="metric">
+      <div class="mval" id="dvt">—</div>
+      <div class="mlbl">Δv total  (m/s)</div>
+      <div class="msub">propellant budget</div>
+    </div>
+    <div class="metric">
+      <div class="mval" id="tof">—</div>
+      <div class="mlbl">Transfer time</div>
+      <div class="msub">coast · no thrust</div>
+    </div>
+  </div>
+
+  <div class="canvas-wrap">
+    <canvas id="orbitCanvas" width="780" height="400"></canvas>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="dot" style="background:#0F6E56"></div> initial orbit r₁</div>
+    <div class="legend-item"><div class="dot" style="background:#D85A30"></div> target orbit r₂</div>
+    <div class="legend-item"><div class="dot" style="background:#888780;width:12px;height:4px;border-radius:2px"></div> transfer ellipse</div>
+    <div class="legend-item"><div class="dot" style="background:#BA7517"></div> burn point</div>
+  </div>
+
+</div>
+
+<div class="footer">Block 4 — Trajectory Planning &nbsp;·&nbsp; μ = 398600.4418 km³/s² (WGS-84)</div>
+
+<script>
+const MU = 398600.4418;
+const canvas = document.getElementById('orbitCanvas');
+const ctx = canvas.getContext('2d');
+
+function compute(r1, r2) {
+  const at = (r1 + r2) / 2;
+  const v1  = Math.sqrt(MU / r1);
+  const v2  = Math.sqrt(MU / r2);
+  const vt1 = Math.sqrt(MU * (2/r1 - 1/at));
+  const vt2 = Math.sqrt(MU * (2/r2 - 1/at));
+  const dv1 = (vt1 - v1) * 1000;
+  const dv2 = (v2 - vt2) * 1000;
+  const tof  = Math.PI * Math.sqrt(at*at*at / MU) / 3600;
+  return { dv1, dv2, dvt: dv1+dv2, tof };
+}
+
+function draw(r1km, r2km) {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#f0ede4';
+  ctx.fillRect(0, 0, W, H);
+
+  const cx = W * 0.36, cy = H * 0.50;
+  const scale = Math.min(W, H) * 0.43 / 42164;
+  const R1 = r1km * scale;
+  const R2 = r2km * scale;
+  const aT = (R1 + R2) / 2;
+  const cT = aT - R1;
+  const bT = Math.sqrt(Math.max(0, aT*aT - cT*cT));
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, R1, 0, Math.PI*2);
+  ctx.strokeStyle = '#0F6E56';
+  ctx.lineWidth = 1.8;
+  ctx.setLineDash([]);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, R2, 0, Math.PI*2);
+  ctx.strokeStyle = '#D85A30';
+  ctx.lineWidth = 1.8;
+  ctx.setLineDash([5,4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  const ecx = cx - cT;
+  ctx.beginPath();
+  ctx.ellipse(ecx, cy, aT, bT, 0, 0, Math.PI);
+  ctx.strokeStyle = '#888780';
+  ctx.lineWidth = 2.2;
+  ctx.stroke();
+
+  const b1x = cx + R1, b2x = cx - R2;
+  [[b1x,'Δv₁'],[b2x,'Δv₂']].forEach(([bx, lbl]) => {
+    ctx.beginPath();
+    ctx.arc(bx, cy, 7, 0, Math.PI*2);
+    ctx.fillStyle = '#BA7517';
+    ctx.fill();
+    ctx.fillStyle = '#412402';
+    ctx.font = '600 11px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(lbl, bx, cy - 15);
+  });
+
+  const earthR = Math.max(14, 6371 * scale);
+  ctx.beginPath();
+  ctx.arc(cx, cy, earthR * 1.4, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(55,138,221,0.12)';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx, cy, earthR * 0.65, 0, Math.PI*2);
+  ctx.fillStyle = '#378ADD';
+  ctx.fill();
+
+  ctx.fillStyle = '#5F5E5A';
+  ctx.font = '11px Georgia, serif';
+  ctx.textAlign = 'right';
+  ctx.fillText('r₂ / r₁ = ' + (r2km/r1km).toFixed(2), W - 18, H - 14);
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#0F6E56';
+  ctx.font = '10px Georgia, serif';
+  if (R1 > 18) ctx.fillText('r₁', cx + R1 * 0.55, cy - 6);
+  ctx.fillStyle = '#D85A30';
+  if (R2 > 30) ctx.fillText('r₂', cx + R2 * 0.88, cy - 8);
+}
+
+function fmt(n) { return Math.round(n).toLocaleString(); }
+
+function update() {
+  const r1 = +document.getElementById('r1').value;
+  let   r2 = +document.getElementById('r2').value;
+  if (r2 < r1 + 500) { r2 = r1 + 500; document.getElementById('r2').value = r2; }
+
+  document.getElementById('r1val').textContent = r1.toLocaleString() + ' km';
+  document.getElementById('r2val').textContent = r2.toLocaleString() + ' km';
+
+  const res = compute(r1, r2);
+  document.getElementById('dv1').textContent = fmt(res.dv1);
+  document.getElementById('dv2').textContent = fmt(res.dv2);
+  document.getElementById('dvt').textContent = fmt(res.dvt);
+  const h = res.tof;
+  document.getElementById('tof').textContent = h >= 24 ? (h/24).toFixed(1)+' days' : h.toFixed(2)+' hr';
+
+  document.getElementById('bielliptic-flag').style.display = (r2/r1) > 11.94 ? 'block' : 'none';
+  draw(r1, r2);
+}
+
+document.getElementById('r1').addEventListener('input', update);
+document.getElementById('r2').addEventListener('input', update);
+update();
+</script>
+</body>
+</html>
